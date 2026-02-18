@@ -2,6 +2,7 @@
     "name": "spotify-wrapper",
     "version": "1.0.0",
     "description": "Premium Spotify Wrapper with Lava Animation",
+    "author": "Sun Shine Never Die",
     "main": "main.js",
     "scripts": {
         "start": "electron .",
