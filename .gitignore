@@ -1,0 +1,15 @@
+node_modules/
+dist/
+dist-squirrel/
+dist-installer/
+Spotify-Premium-win32-x64/
+build-cache/
+eb-cache/
+ebcache/
+*.log
+.DS_Store
+build-installer.js
+build-sq-installer.js
+convert-icon.js
+spotify_icon_large.png
+spotify_icon_premium.png

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Wrapper</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="title-bar">
+        <div id="left-controls">
+            <button id="back-nav" class="control-btn nav-btn" title="Back">&#8592;</button>
+        </div>
+        <div id="drag-region"></div>
+        <div id="window-controls">
+            <button id="min-button" class="control-btn">&#8211;</button>
+            <button id="max-button" class="control-btn">&#9634;</button>
+            <button id="close-button" class="control-btn close">&#10005;</button>
+        </div>
+    </div>
+
+    <div id="content">
+        <div id="loading-overlay">
+            <div class="spinner"></div>
+            <span>Loading Spotify...</span>
+        </div>
+        <webview id="spotify-view" src="https://open.spotify.com/"
+            useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+            partition="persist:spotify" allowpopups></webview>
+    </div>
+
+    <div id="lava-taskbar">
+        <div class="lava-container">
+            <div class="lava-blob" style="--i:1"></div>
+            <div class="lava-blob" style="--i:2"></div>
+            <div class="lava-blob" style="--i:3"></div>
+            <div class="lava-blob" style="--i:4"></div>
+            <div class="lava-blob" style="--i:5"></div>
+            <div class="lava-blob" style="--i:6"></div>
+        </div>
+        <div class="taskbar-content">
+            <span id="song-info" class="status-text">Spotify Ready</span>
+            <button id="youtube-fallback" class="nav-btn"
+                style="margin-left: 15px; background: none; border: 1px solid #ff0000; color: #ff0000; border-radius: 4px; padding: 2px 8px; cursor: pointer; display: none; font-size: 10px; -webkit-app-region: no-drag;">|>
+                YouTube</button>
+        </div>
+        <svg xmlns="http://www.w3.org/2000/svg" version="1.1" style="display: none;">
+            <defs>
+                <filter id="goo">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="15" result="blur" />
+                    <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -10"
+                        result="goo" />
+                </filter>
+            </defs>
+        </svg>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+        const webview = document.getElementById('spotify-view');
+
+        // Media command handler (bridging native keys to webview)
+        ipcRenderer.on('media-command', (event, command) => {
+            switch (command) {
+                case 'play-pause':
+                    webview.executeJavaScript("document.querySelector('[data-testid=\"control-button-playpause\"]')?.click()");
+                    break;
+                case 'next':
+                    webview.executeJavaScript("document.querySelector('[data-testid=\"control-button-skip-forward\"]')?.click()");
+                    break;
+                case 'previous':
+                    webview.executeJavaScript("document.querySelector('[data-testid=\"control-button-skip-back\"]')?.click()");
+                    break;
+            }
+        });
+
+        // Navigation logic
+        const backButton = document.getElementById('back-nav');
+        backButton.addEventListener('click', () => {
+            if (webview.canGoBack()) {
+                webview.goBack();
+            } else {
+                webview.loadURL('https://open.spotify.com/');
+            }
+        });
+
+        // Update button state based on history
+        webview.addEventListener('did-navigate', () => {
+            backButton.style.opacity = webview.canGoBack() ? "1" : "0.3";
+        });
+
+        webview.addEventListener('dom-ready', () => {
+            // Hide loading overlay
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) overlay.style.display = 'none';
+
+            // Inject CSS to hide web-specific clutter for a "Native" look
+            webview.insertCSS(`
+                /* Hide "Install App" and "Explore Premium" */
+                [aria-label="Install App"],
+                .Xm9vB_SOnL6H_iUq9j9e, 
+                .desktop-client-install-link,
+                [data-testid="sidebar-install-item"],
+                button[data-testid="header-button-install-app"],
+                [aria-label="Explore Premium"],
+                .GfV7UvID7zXz_Xvz7zXz,
+                .main-view-container__scroll-node-child-spacer {
+                    display: none !important;
+                }
+                
+                /* Hide "Open App" banners */
+                .LayoutResizer__resize-bar,
+                .Root__top-container:has(.LayoutResizer__resize-bar) {
+                    /* adjustment if needed */
+                }
+
+                /* Hide Upgrade buttons */
+                button[aria-label="Upgrade to Premium"],
+                button[data-testid="upgrade-button"] {
+                    display: none !important;
+                }
+            `);
+        });
+
+        // Set preload for webview too
+        webview.setAttribute('preload', './preload.js');
+
+        // Window controls
+        document.getElementById('min-button').addEventListener('click', () => ipcRenderer.send('window-minimize'));
+        document.getElementById('max-button').addEventListener('click', () => ipcRenderer.send('window-maximize'));
+        document.getElementById('close-button').addEventListener('click', () => ipcRenderer.send('window-close'));
+
+        // YouTube Fallback & Song Info Bridge
+        setInterval(async () => {
+            try {
+                const info = await webview.executeJavaScript(`
+                    (() => {
+                        const title = document.querySelector('[data-testid="context-item-link"]')?.innerText;
+                        const artist = document.querySelector('[data-testid="context-item-info-artist"]')?.innerText;
+                        return { title, artist };
+                    })()
+                `);
+
+                const display = document.getElementById('song-info');
+                const ytButton = document.getElementById('youtube-fallback');
+
+                if (info && info.title) {
+                    display.innerText = `${info.title} - ${info.artist}`;
+                    ytButton.style.display = 'inline-block';
+                    ytButton.onclick = () => {
+                        const query = encodeURIComponent(`${info.title} ${info.artist}`);
+                        webview.loadURL(`https://www.youtube.com/embed?listType=search&list=${query}&autoplay=1`);
+                    };
+                }
+            } catch (e) {
+                // Spotify not logged in or element not found
+            }
+        }, 3000);
+    </script>
+</body>
+
+</html>
