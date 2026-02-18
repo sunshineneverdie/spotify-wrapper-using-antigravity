@@ -1,4 +1,5 @@
-# Spotify Premium Wrapper 🎵
+# #Built with love with the help of CipherSchools#
+
 
 A premium, feature-rich Spotify desktop wrapper built with Electron. This app provides a "Native Desktop" experience for Spotify with added power features and extreme UI customization.
 
@@ -45,7 +46,3 @@ A premium, feature-rich Spotify desktop wrapper built with Electron. This app pr
 
 ## 📜 License
 MIT License. Created by Sun Shine Never Die.
-# spotify-wrapper-using-antigravity
-# spotify-wrapper-using-antigravity
-# spotify-wrapper-using-antigravity
-# spotify-wrapper-using-antigravity
